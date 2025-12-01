@@ -214,10 +214,11 @@ def signImage(imagePath, hiddenString, publicKeyPath = None) :
         public_key = serialization.load_pem_public_key(pem_data)
             
         hiddenBinary = BinaryProvider(
-            hiddenString = stringCryptor(hiddenString+"\n",public_key), 
-            startString = stringCryptor("START-VALIDATION\n",public_key), 
-            endString=stringCryptor("\nEND-VALIDATION",public_key)
+            hiddenString = stringCryptor(hiddenString,public_key)+"\n", 
+            startString = stringCryptor("START-VALIDATION",public_key)+"\n", 
+            endString="\n"+stringCryptor("END-VALIDATION",public_key)
             )
+        
     else : # 키 없는경우
         hiddenBinary = BinaryProvider(hiddenString + "\n")
 

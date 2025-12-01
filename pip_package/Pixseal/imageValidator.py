@@ -124,21 +124,16 @@ def decrypt_array(deduplicated, privKeyPath):
 def validateImage(imagePath, privKeyPath = None):
     resultBinary = readHiddenBit(imagePath)
     resultString = binaryToString(resultBinary)
-
-    if privKeyPath :
-        splited = re.findall(r'[^=]+==', resultString)
-    else :
-        splited = resultString.split("\n")
-
+    splited = resultString.split("\n")
     deduplicated = deduplicate(splited)
 
     if privKeyPath:
         decrypted = decrypt_array(deduplicated,privKeyPath)
     else :
-        decrypted = splited
+        decrypted = deduplicated
 
     report = buildValidationReport(decrypted)
     return {
-        "deduplicated": deduplicated,
+        "decrypted": decrypted,
         "validationReport": report
     }
