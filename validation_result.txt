@@ -1,4 +1,0 @@
-START-VALIDATION
-!Validation:kyj9447@mailmail.com
-!Validation:kyj9447
-END-VALIDATION
