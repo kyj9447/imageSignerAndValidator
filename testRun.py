@@ -1,49 +1,73 @@
 import sys
 from pathlib import Path
 
-# pip 패키지 디렉터리를 sys.path에 추가하여 로컬 테스트에서 import 가능하도록 설정
-ROOT_DIR = Path(__file__).resolve().parent
-PACKAGE_DIR = ROOT_DIR / "pip_package"
+ROOT = Path(__file__).resolve().parent
+PACKAGE_DIR = ROOT / "pip_package"
 if str(PACKAGE_DIR) not in sys.path:
     sys.path.insert(0, str(PACKAGE_DIR))
 
-
-# main
-from pprint import pprint
 from Pixseal import signImage, validateImage
 
-choice = input("작업을 선택하세요\n1. Sign Image\n2. Validate Image\n")
+DEFAULT_PUBLIC_KEY = "SSL/public_key.pem"
+DEFAULT_PRIVATE_KEY = "SSL/private_key.pem"
 
-if choice == "1":
+def sign_demo(image="original.png", payload=None, encrypt=False, pubkey=None):
+    payload = payload or "!Validation:kyj9447@mailmail.com"
+    output = Path("signed_" + Path(image).name)
+    selected_key = pubkey if encrypt else None
+    if encrypt and not selected_key:
+        selected_key = str(DEFAULT_PUBLIC_KEY)
+    signed = signImage(image, payload, selected_key)
+    signed.save(output)
+    print(f"[Sign] saved -> {output}")
+    if selected_key:
+        print(f"[Sign] encrypted with public key: {selected_key}")
+    else:
+        print("[Sign] plain-text payload injected")
 
-    image = "original.png"
-    string = input("주입할 문자열을 입력하세요: ")
+def validate_demo(image="signed_original.png", decrypt=False, privkey=None):
+    selected_key = privkey if decrypt else None
+    if decrypt and not selected_key:
+        selected_key = str(DEFAULT_PRIVATE_KEY)
 
-    if string == "":
-        print("입력이 없습니다. 기본값으로 설정합니다. (!Validation:kyj9447@mailmail.com)")
-        string = "!Validation:kyj9447@mailmail.com"
+    result = validateImage(image, selected_key)
+    report = result["validationReport"]
+    extracted = result.get("extractedString", "")
+    print("[Validate] verdict:", report["verdict"])
+    print("[Validate] extracted string:", extracted)
+    if selected_key:
+        print(f"[Validate] decrypted with private key: {selected_key}")
+    else:
+        print("[Validate] used plain-text extraction")
 
-    choice2 = input("1.암호 포함\n2.평문\n")
-    if choice2 == "1":
-        signedImage = signImage(image, string,publicKeyPath="SSL/public_key.pem") # string 끝에 줄바꿈 추가
-    elif choice2 == "2":
-        signedImage = signImage(image, string)
+def _prompt_bool(message, default=False):
+    suffix = " [Y/n]: " if default else " [y/N]: "
+    choice = input(message + suffix).strip().lower()
+    if not choice:
+        return default
+    return choice in ("y", "yes")
 
-    signedImage.save("signed_"+image)
-    print("signed_"+image+ " 파일이 작성되었습니다.")
+def main():
+    choice = input("1: Sign Image / 2: Validate Image >> ").strip()
+    if choice == "1":
+        image = input("이미지 파일 (기본 original.png): ").strip() or "original.png"
+        msg = input("주입 문자열 (Enter=default): ")
+        encrypt = _prompt_bool("RSA 공개키로 암호화할까요?", default=True)
+        pubkey = None
+        if encrypt:
+            pubkey_input = input(f"공개키 경로 (기본 {DEFAULT_PUBLIC_KEY}): ").strip()
+            pubkey = pubkey_input or None
+        sign_demo(image, msg or None, encrypt, pubkey)
+    elif choice == "2":
+        image = input("검증 대상 (기본 signed_original.png): ").strip() or "signed_original.png"
+        decrypt = _prompt_bool("RSA 개인키로 복호화할까요?", default=True)
+        privkey = None
+        if decrypt:
+            privkey_input = input(f"개인키 경로 (기본 {DEFAULT_PRIVATE_KEY}): ").strip()
+            privkey = privkey_input or None
+        validate_demo(image, decrypt, privkey)
+    else:
+        print("잘못된 입력입니다.")
 
-elif choice == "2":
-
-    image = "signed_original.png"
-
-    choice3 = input("1.암호 포함\n2.평문\n")
-    if choice3 == "1":
-        validation = validateImage(image, privKeyPath="SSL/private_key.pem")
-    elif choice3 == "2":
-        validation = validateImage(image)
-    
-    print("검증 결과:")
-    pprint(validation)
-    
-else:
-    print("잘못된 입력입니다.")
+if __name__ == "__main__":
+    main()
