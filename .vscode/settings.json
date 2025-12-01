@@ -1,0 +1,5 @@
+{
+    "python.analysis.extraPaths": [
+        "./pip_package"
+    ]
+}

@@ -1,0 +1,11 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "Pixseal"
+version = "0.1.0"
+description = "Noise-based image signer and validator"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = []
