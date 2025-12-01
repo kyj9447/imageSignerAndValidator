@@ -53,7 +53,7 @@ def deduplicate(arr):
             deduplicated.append(arr[i])
     return deduplicated
 
-def buildValidationReport(decrypted):
+def buildValidationReport(decrypted, skipPlain=False):
     # 복호화된 배열 길이 (중복제거 기준)
     arrayLength = len(decrypted)
 
@@ -81,7 +81,7 @@ def buildValidationReport(decrypted):
     # 모두 true일 경우 Success, 하나라도 false일 경우 Fail
     verdict = all([lengthCheck, startCheck, endCheck, isDecrypted])
 
-    return {
+    result = {
         "arrayLength": arrayLength,
         "lengthCheck": lengthCheck,
         "startCheck": startCheck,
@@ -89,6 +89,9 @@ def buildValidationReport(decrypted):
         "isDecrypted": isDecrypted,
         "verdict": verdict
     }
+    if skipPlain:
+        result["decryptSkipMessage"] = "복호화 요청이 들어왔으나, 암호화된 문자열이 아니어서 복호화하지 않았습니다."
+    return result
 
 def decrypt_array(deduplicated, privKeyPath):
     # PEM private key 읽기
@@ -99,6 +102,7 @@ def decrypt_array(deduplicated, privKeyPath):
         )
 
     decrypted = []
+    skipped_plain = False
     for item in deduplicated:
         if item.endswith("=="):
             try:
@@ -114,11 +118,13 @@ def decrypt_array(deduplicated, privKeyPath):
                 decrypted.append(plain_bytes.decode("utf-8"))
             except Exception as exc:
                 print(exc)
+                skipped_plain = True
                 decrypted.append(item)
         else:
+            skipped_plain = True
             decrypted.append(item)
 
-    return decrypted
+    return decrypted, skipped_plain
 
 # main
 def validateImage(imagePath, privKeyPath = None):
@@ -128,11 +134,12 @@ def validateImage(imagePath, privKeyPath = None):
     deduplicated = deduplicate(splited)
 
     if privKeyPath:
-        decrypted = decrypt_array(deduplicated,privKeyPath)
+        decrypted, skipped_plain = decrypt_array(deduplicated,privKeyPath)
     else :
         decrypted = deduplicated
+        skipped_plain = False
 
-    report = buildValidationReport(decrypted)
+    report = buildValidationReport(decrypted, skipped_plain)
     return {
         "extractedString": decrypted[1],
         "validationReport": report
