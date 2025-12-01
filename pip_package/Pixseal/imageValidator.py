@@ -1,4 +1,9 @@
-from simpleImage import SimpleImage
+import base64
+import re
+from cryptography.hazmat.primitives import serialization, hashes
+from cryptography.hazmat.primitives.asymmetric import padding
+
+from .simpleImage import SimpleImage
 
 def binaryToString(binaryCode):
     string = ""
@@ -48,9 +53,9 @@ def deduplicate(arr):
             deduplicated.append(arr[i])
     return deduplicated
 
-def buildValidationReport(decrypted, deduplicated):
+def buildValidationReport(decrypted):
     # 복호화된 배열 길이 (중복제거 기준)
-    arrayLength = len(deduplicated)
+    arrayLength = len(decrypted)
 
     # 1. 중복제거, 복호화 완료된 배열의 길이를 확인하여 성공/실패 여부 판단
     lengthCheck = True if arrayLength == 3 or arrayLength == 4 else False
@@ -59,14 +64,14 @@ def buildValidationReport(decrypted, deduplicated):
     startCheck = decrypted[0] == "START-VALIDATION" if decrypted else False
     endCheck = decrypted[-1] == "END-VALIDATION" if decrypted else False
 
-    # 3. 시작, 끝 부분이 암호화 -> 복호화 되지 않은경우
-    # 복호화 하지 않은 START-VALIDATION, END-VALIDATION이 deduplicated에 있으면 false
-    if deduplicated:
-        startIsCrypted = False if deduplicated[0] == "START-VALIDATION" else True
-        endIsCrypted = False if deduplicated[-1] == "END-VALIDATION" else True
-    else:
-        startIsCrypted = False
-        endIsCrypted = False
+    # # 3. 시작, 끝 부분이 암호화 -> 복호화 되지 않은경우
+    # # 복호화 하지 않은 START-VALIDATION, END-VALIDATION이 deduplicated에 있으면 false
+    # if deduplicated:
+    #     startIsCrypted = False if deduplicated[0] == "START-VALIDATION" else True
+    #     endIsCrypted = False if deduplicated[-1] == "END-VALIDATION" else True
+    # else:
+    #     startIsCrypted = False
+    #     endIsCrypted = False
 
     # 4. 두번째 요소 복호화 여부 확인 (==로 끝나면 암호화된 문자열임)
     decryptedPayload = decrypted[1] if len(decrypted) > 1 else ""
@@ -74,30 +79,66 @@ def buildValidationReport(decrypted, deduplicated):
 
     # 최종 결과
     # 모두 true일 경우 Success, 하나라도 false일 경우 Fail
-    verdict = all([lengthCheck, startCheck, endCheck, isDecrypted, startIsCrypted, endIsCrypted])
+    verdict = all([lengthCheck, startCheck, endCheck, isDecrypted])
 
     return {
         "arrayLength": arrayLength,
         "lengthCheck": lengthCheck,
         "startCheck": startCheck,
         "endCheck": endCheck,
-        "startIsCrypted": startIsCrypted,
-        "endIsCrypted": endIsCrypted,
         "isDecrypted": isDecrypted,
         "verdict": verdict
     }
 
+def decrypt_array(deduplicated, privKeyPath):
+    # PEM private key 읽기
+    with open(privKeyPath, "rb") as key_file:
+        private_key = serialization.load_pem_private_key(
+            key_file.read(),
+            password=None,
+        )
+
+    decrypted = []
+    for item in deduplicated:
+        if item.endswith("=="):
+            try:
+                cipher_bytes = base64.b64decode(item)
+                plain_bytes = private_key.decrypt(
+                    cipher_bytes,
+                    padding.OAEP(
+                        mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                        algorithm=hashes.SHA256(),
+                        label=None,
+                    ),
+                )
+                decrypted.append(plain_bytes.decode("utf-8"))
+            except Exception as exc:
+                print(exc)
+                decrypted.append(item)
+        else:
+            decrypted.append(item)
+
+    return decrypted
+
 # main
-def validateImage(imagePath):
+def validateImage(imagePath, privKeyPath = None):
     resultBinary = readHiddenBit(imagePath)
     resultString = binaryToString(resultBinary)
-    decrypted = resultString.split("\n")
-    deduplicated = deduplicate(decrypted)
-    report = buildValidationReport(decrypted, deduplicated)
+
+    if privKeyPath :
+        splited = re.findall(r'[^=]+==', resultString)
+    else :
+        splited = resultString.split("\n")
+
+    deduplicated = deduplicate(splited)
+
+    if privKeyPath:
+        decrypted = decrypt_array(deduplicated,privKeyPath)
+    else :
+        decrypted = splited
+
+    report = buildValidationReport(decrypted)
     return {
-        "decrypted": decrypted,
         "deduplicated": deduplicated,
-        "decryptedText": "\n".join(decrypted),
-        "deduplicatedText": "\n".join(deduplicated),
         "validationReport": report
     }

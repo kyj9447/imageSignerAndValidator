@@ -1,22 +1,25 @@
-from simpleImage import SimpleImage
+import base64
+from pathlib import Path
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import padding
+
+from .simpleImage import SimpleImage
 
 class BinaryProvider:
 
     # 생성자
-    def __init__(self, hiddenString):
+    def __init__(self, hiddenString, startString = "START-VALIDATION\n", endString="\nEND-VALIDATION"):
         self.hiddenBinary = self.strToBinary(hiddenString)
         self.hiddenBinaryIndex = 0
         self.hiddenBinaryIndexMax = len(self.hiddenBinary)
 
         # 시작 문자열
-        self.startString = "START-VALIDATION\n"
-        self.startBinary = self.strToBinary(self.startString)
+        self.startBinary = self.strToBinary(startString)
         self.startBinaryIndex = 0
         self.startBinaryIndexMax = len(self.startBinary)
 
         # 종료 문자열
-        self.endString = "\nEND-VALIDATION"
-        self.endBinary = self.strToBinary(self.endString)
+        self.endBinary = self.strToBinary(endString)
         # 종료 문자열은 마지막 비트부터 역순으로 입력
         self.endBinaryIndex = len(self.endBinary)-1
         self.endBinaryIndexMin = 0
@@ -182,9 +185,41 @@ def addHiddenBit(imagePath, hiddenBinary):
     # 수정된 이미지를 return
     return img
 
+def stringCryptor(plaintext: str, public_key) -> str:
+    
+    ciphertext = public_key.encrypt(
+        plaintext.encode("utf-8"),
+        padding.OAEP(
+            mgf=padding.MGF1(algorithm=hashes.SHA256()),
+            algorithm=hashes.SHA256(),
+            label=None,
+        ),
+    )
+
+    return base64.b64encode(ciphertext).decode("ascii")
+
 # main
 # 이미지 경로 + 주입할 String => String 주입된 Image
-def signImage(imagePath, hiddenString) :
-    hiddenBinary = BinaryProvider(hiddenString+"\n")
+def signImage(imagePath, hiddenString, publicKeyPath = None) :
+
+    if publicKeyPath : # 키 있는경우
+        key_path = Path(publicKeyPath)
+        if not key_path.is_file():
+            raise FileNotFoundError(f"Public key file not found: {publicKeyPath}")
+
+        pem_data = key_path.read_bytes()
+        if b"BEGIN PUBLIC KEY" not in pem_data:
+            raise ValueError("Provided file does not contain a valid public key")
+
+        public_key = serialization.load_pem_public_key(pem_data)
+            
+        hiddenBinary = BinaryProvider(
+            hiddenString = stringCryptor(hiddenString+"\n",public_key), 
+            startString = stringCryptor("START-VALIDATION\n",public_key), 
+            endString=stringCryptor("\nEND-VALIDATION",public_key)
+            )
+    else : # 키 없는경우
+        hiddenBinary = BinaryProvider(hiddenString + "\n")
+
     signedImage = addHiddenBit(imagePath, hiddenBinary)
     return signedImage
