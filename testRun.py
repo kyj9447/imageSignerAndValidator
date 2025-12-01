@@ -23,7 +23,7 @@ if choice == "1":
         print("입력이 없습니다. 기본값으로 설정합니다. (!Validation:kyj9447@mailmail.com)")
         string = "!Validation:kyj9447@mailmail.com"
 
-    choice2 = input("1.암호 포함\n2.평문")
+    choice2 = input("1.암호 포함\n2.평문\n")
     if choice2 == "1":
         signedImage = signImage(image, string,publicKeyPath="SSL/public_key.pem") # string 끝에 줄바꿈 추가
     elif choice2 == "2":

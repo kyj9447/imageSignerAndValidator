@@ -134,6 +134,6 @@ def validateImage(imagePath, privKeyPath = None):
 
     report = buildValidationReport(decrypted)
     return {
-        "decrypted": decrypted,
+        "extractedString": decrypted[1],
         "validationReport": report
     }
