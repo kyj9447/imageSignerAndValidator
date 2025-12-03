@@ -1,3 +1,4 @@
+# This project is moved to https://github.com/kyj9447/Pixseal
 ## imageSigner
 #### signImage("이미지 경로/이름", "주입할 문자열") => 문자열이 주입된 Image return
 
